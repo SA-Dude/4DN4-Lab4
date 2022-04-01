@@ -22,6 +22,7 @@ class Server:
     
     def __init__(self):
         self.create_listen_sockets()
+        self.process_connections()
     
     def create_listen_sockets(self):
         try:
@@ -40,7 +41,7 @@ class Server:
         inputs = [self.udp_socket]
         outputs = []
 
-        readable, writeble, exec = select.select(inputs, outputs, inputs)
+        readable, writeble, _ = select.select(inputs, outputs, inputs)
 
         for client in readable:
             if client == self.udp_socket:
@@ -67,24 +68,56 @@ class Server:
 
         new_thread = Thread(target=self.room_thread, args=(name, ip_addr, port))
         new_thread.start()
+
+        self.running_threads.append(name)
     
-    def room_thread(arg):
+    def room_thread(self, arg):
+        connected_clients = []
+
         # Make socket for room
-        print("Making '%s' socket")
+        print("Making socket for {}".format(arg[0]))
         try:
-            x = 10
+            # Create UDP socket
+            room_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            room_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            room_socket.bind((arg[1],arg[2]))
+            room_socket.setblocking(False)
+            print("Room: {}, Listening on port {} ( TCP )".format(arg[0], arg[2]))
         except Exception as msg:
             print(msg)
             exit(1)
+        
+        while True:
+            # Listen for incoming client connections to the room
+            try:
+                new_connection = room_socket.recvfrom(Server.BUFFER_SIZE)  
+                new_client_addr = new_connection[1]
+
+                # This is a new client, add them to the connected_clients list and move on
+                if new_client_addr not in connected_clients:
+                    print("Welcome {} to the chat room!".format(new_connection[1]))
+                    connected_clients.append(new_connection[1])
+                else:
+                    # This is a pre-existing client
+                    client_msg = new_connection[0]
+                    
+                    for client in connected_clients:
+                        if client is not new_client_addr:
+                            # Distribute client message to other clients in room
+                            room_socket.sendto(client_msg, client)
+
+            except socket.error as msg:
+                # Nothing coming into this room, keep going until something does
+                pass
 
     
-    # def getDir(self, address):
-    #     path = os.path.dirname(os.path.abspath(__file__))
-    #     file_list = os.listdir(path)
+    def getDir(self, address):
+        path = os.path.dirname(os.path.abspath(__file__))
+        file_list = os.listdir(path)
 
-    #     pkt = ""
-    #     for file in file_list:
-    #         pkt += "(%s, %s)\t - %s".format(room_name, address, file)
+        pkt = ""
+        for file in file_list:
+            pkt += "(%s, %s)\t - %s".format(room_name, address, file)
         
 
 
