@@ -14,6 +14,10 @@ CMD = {
 CMD_FIELD_LEN            = 1 # 1 byte commands sent from the client.
 SOCKET_TIMEOUT           = 10
 
+CHAT_PROMPT = ">> "
+SERVER_PROMT = "(Connected to Server) >> "
+CTRL_KEY_ASCII = 24
+
 ########################################################################
 # recv_bytes frontend to recv
 ########################################################################
@@ -101,7 +105,7 @@ class Client:
     
     def connected_to_server(self):
         while True:
-            connected_cmd = input("(Connected to Server) >> ")
+            connected_cmd = input(SERVER_PROMT)
 
             if connected_cmd[:6].lower() == "getdir":
                 self.getDir_cmd()
@@ -183,13 +187,25 @@ class Client:
         
         while True:
             client_msg = "{}: ".format(self.USER_NAME)
-            client_msg += input(">> ")
-            self.udp_socket.sendto(client_msg.encode(Client.MSG_ENCODING), room_address)
+            client_msg += input(CHAT_PROMPT)
 
             try:
-                # Try and receive any messages broadcasted in the room
-                incoming_msg, room_addr = self.udp_socket.recvfrom(Client.RECV_BUFFER_SIZE)
-                print(incoming_msg)
+                if ord(client_msg[-1]) == CTRL_KEY_ASCII:
+                    break
+            except TypeError as _:
+                pass
+            
+            if client_msg != ("{}: ".format(self.USER_NAME) + CHAT_PROMPT):
+                self.udp_socket.sendto(client_msg.encode(Client.MSG_ENCODING), room_address)
+
+            try:
+                while True:
+                    # Try and receive any messages broadcasted in the room
+                    incoming_msg, room_addr = self.udp_socket.recvfrom(Client.RECV_BUFFER_SIZE)
+                    if incoming_msg:
+                        print(incoming_msg.decode(Client.MSG_ENCODING))
+                    else:
+                        break
             except socket.error as _:
                 pass
       

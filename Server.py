@@ -122,18 +122,20 @@ class Server:
         while True:
             # Listen for incoming client connections to the room
             try:
-                client_msg, new_client_addr = room_socket.recvfrom(Server.BUFFER_SIZE)  
+                client_msg, new_client_addr = room_socket.recvfrom(Server.BUFFER_SIZE)
+                print(new_client_addr)
 
                 # This is a new client, add them to the connected_clients list and move on
                 if new_client_addr not in connected_clients:
                     print("Welcome {} to the chat room!".format(new_client_addr))
                     connected_clients.append(new_client_addr)
-                else:
-                    # This is a pre-existing client                    
-                    for client in connected_clients:
-                        if client is not new_client_addr:
-                            # Distribute client message to other clients in room
-                            room_socket.sendto(client_msg, client)
+                
+                for client in connected_clients:
+                    if client != new_client_addr:
+                        # Distribute client message to other clients in room
+                        room_socket.sendto(client_msg, client) 
+                                        
+                    
 
             except socket.error as msg:
                 # Nothing coming into this room, keep going until something does
